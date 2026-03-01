@@ -62,7 +62,6 @@ const validate = (req, res, next) => {
 router.post(
   '/',
   [
-    body('userId').isUUID().withMessage('Valid user ID (UUID) is required'),
     body('countryId').isUUID().withMessage('Valid country ID (UUID) is required'),
     body('items').isArray({ min: 1 }).withMessage('items must be a non-empty array'),
     body('items.*.countryProductId').isUUID().withMessage('Each item must have a valid countryProductId (UUID)'),

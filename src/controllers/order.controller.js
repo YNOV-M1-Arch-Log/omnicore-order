@@ -4,7 +4,8 @@ const { logger } = require('../config/logger');
 class OrderController {
   async create(req, res, next) {
     try {
-      const { userId, countryId, items } = req.body;
+      const userId = req.headers['x-user-id'];
+      const { countryId, items } = req.body;
       const correlationId = req.correlationId ? req.correlationId() : undefined;
       const order = await orderService.createOrder({ userId, countryId, items }, correlationId);
       logger.info({ orderId: order.id, userId }, 'Order created');
