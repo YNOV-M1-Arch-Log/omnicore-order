@@ -1,0 +1,222 @@
+// Shared Prisma schema — must stay in sync across all omnicore services
+// Source of truth: omnicore-product/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Country {
+  id              String           @id @default(uuid())
+  name            String           @db.VarChar(255)
+  countryCode     String           @unique @map("country_code") @db.VarChar(10)
+  currency        String?          @db.VarChar(10)
+  isActive        Boolean          @default(true) @map("is_active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  countryProducts CountryProduct[]
+  authUsers       AuthUser[]
+  users           User[]
+  userAddresses   UserAddress[]
+
+  @@map("countries")
+}
+
+model Product {
+  id              String           @id @default(uuid())
+  name            String           @db.VarChar(255)
+  description     String?          @db.Text
+  isActive        Boolean          @default(true) @map("is_active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  countryProducts CountryProduct[]
+  images          ProductImage[]
+
+  @@map("products")
+}
+
+model CountryProduct {
+  id          String      @id @default(uuid())
+  productId   String      @map("product_id")
+  countryId   String      @map("country_id")
+  price       Decimal     @db.Decimal(10, 2)
+  currency    String?     @db.VarChar(10)
+  quantity    Int         @default(0)
+  isAvailable Boolean     @default(true) @map("is_available")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  country     Country     @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+
+  @@unique([productId, countryId])
+  @@index([productId])
+  @@index([countryId])
+  @@map("country_products")
+}
+
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String  @map("product_id")
+  url       String  @db.Text
+  publicId  String? @map("public_id") @db.Text
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model Role {
+  id          String     @id @default(uuid())
+  name        String     @db.VarChar(50)
+  description String?    @db.Text
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+model AuthUser {
+  id              String        @id @default(uuid())
+  email           String        @unique @db.VarChar(255)
+  passwordHash    String        @map("password_hash") @db.VarChar(255)
+  countryId       String?       @map("country_id")
+  isActive        Boolean       @default(true) @map("is_active")
+  emailVerified   Boolean       @default(false) @map("email_verified")
+  lastLoginAt     DateTime?     @map("last_login_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  country         Country?      @relation(fields: [countryId], references: [id], onDelete: SetNull)
+  user            User?
+  userRoles       UserRole[]
+  authSessions    AuthSession[]
+
+  @@index([countryId])
+  @@map("auth_users")
+}
+
+model User {
+  id              String            @id
+  countryId       String?           @map("country_id")
+  firstName       String?           @map("first_name") @db.VarChar(100)
+  lastName        String?           @map("last_name") @db.VarChar(100)
+  phoneNumber     String?           @map("phone_number") @db.VarChar(20)
+  status          String?           @db.VarChar(50)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  authUser        AuthUser          @relation(fields: [id], references: [id], onDelete: Cascade)
+  country         Country?          @relation(fields: [countryId], references: [id], onDelete: SetNull)
+  userAddresses   UserAddress[]
+  userPreferences UserPreference?
+  userAuditLogs   UserAuditLog[]
+
+  @@index([countryId])
+  @@map("users")
+}
+
+model UserRole {
+  userId     String   @map("user_id")
+  roleId     String   @map("role_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  authUser   AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model AuthSession {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  refreshToken String    @map("refresh_token") @db.Text
+  expiresAt    DateTime  @map("expires_at")
+  ipAddress    String?   @map("ip_address") @db.VarChar(45)
+  userAgent    String?   @map("user_agent") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  authUser     AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+model UserAddress {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  countryId  String?  @map("country_id")
+  street     String?  @db.Text
+  city       String?  @db.VarChar(100)
+  postalCode String?  @map("postal_code") @db.VarChar(20)
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country    Country? @relation(fields: [countryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([countryId])
+  @@map("user_addresses")
+}
+
+model UserPreference {
+  id                   String  @id @default(uuid())
+  userId               String  @unique @map("user_id")
+  language             String? @db.VarChar(10)
+  timezone             String? @db.VarChar(50)
+  notificationsEnabled Boolean @default(true) @map("notifications_enabled")
+
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UserAuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  action      String   @db.VarChar(255)
+  performedBy String?  @map("performed_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("user_audit_logs")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  countryId   String      @map("country_id")
+  status      String      @default("pending") @db.VarChar(50)
+  totalAmount Decimal     @map("total_amount") @db.Decimal(10, 2)
+  currency    String      @db.VarChar(10)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  items       OrderItem[]
+
+  @@index([userId])
+  @@index([countryId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String         @id @default(uuid())
+  orderId          String         @map("order_id")
+  countryProductId String         @map("country_product_id")
+  quantity         Int
+  unitPrice        Decimal        @map("unit_price") @db.Decimal(10, 2)
+  currency         String         @db.VarChar(10)
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  countryProduct   CountryProduct @relation(fields: [countryProductId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([countryProductId])
+  @@map("order_items")
+}
