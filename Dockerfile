@@ -13,6 +13,7 @@ COPY omnicore-user/package.json    ./omnicore-user/package.json
 COPY omnicore-product/package.json ./omnicore-product/package.json
 COPY omnicore-gateway/package.json ./omnicore-gateway/package.json
 COPY omnicore-order/package.json   ./omnicore-order/package.json
+COPY omnicore-payment/package.json ./omnicore-payment/package.json
 
 # Shared DB package — contains schema + migrations + Prisma client source
 COPY omnicore-db/ ./omnicore-db/
