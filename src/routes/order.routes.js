@@ -17,7 +17,7 @@ const validate = (req, res, next) => {
  * @swagger
  * tags:
  *   - name: Orders
- *     description: Order lifecycle management
+ *     description: Order taking and fulfillment lifecycle management
  */
 
 /**
@@ -25,8 +25,11 @@ const validate = (req, res, next) => {
  * /api/orders:
  *   post:
  *     tags: [Orders]
- *     summary: Create a new order
- *     description: Creates an order, validates stock, computes total, and decrements stock in the product service.
+ *     summary: Place a new order (Order Taking)
+ *     description: |
+ *       Validates product availability and stock, computes the total amount,
+ *       persists the order and automatically decrements stock in the product service.
+ *       Optionally accepts a shipping address and customer notes.
  *     requestBody:
  *       required: true
  *       content:
@@ -53,7 +56,7 @@ const validate = (req, res, next) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       422:
- *         description: Insufficient stock or invalid country
+ *         description: Insufficient stock, product unavailable, or invalid country
  *         content:
  *           application/json:
  *             schema:
@@ -66,6 +69,8 @@ router.post(
     body('items').isArray({ min: 1 }).withMessage('items must be a non-empty array'),
     body('items.*.countryProductId').isUUID().withMessage('Each item must have a valid countryProductId (UUID)'),
     body('items.*.quantity').isInt({ min: 1 }).withMessage('Each item quantity must be an integer >= 1'),
+    body('shippingAddress').optional().isObject().withMessage('shippingAddress must be an object'),
+    body('notes').optional().isString().trim().isLength({ max: 1000 }).withMessage('notes must be a string up to 1000 chars'),
     validate,
   ],
   orderController.create,
@@ -158,13 +163,22 @@ router.get(
  * /api/orders/{id}/status:
  *   patch:
  *     tags: [Orders]
- *     summary: Update order status (Principal, Tenant only)
+ *     summary: Advance order through its lifecycle (Order Processing)
  *     description: |
  *       Allowed transitions:
- *       - pending → confirmed, cancelled
- *       - confirmed → shipped, cancelled
- *       - shipped → delivered
- *       - delivered / cancelled → (terminal, no further transitions)
+ *       - **pending → confirmed, cancelled**
+ *       - **confirmed → shipped, cancelled**
+ *       - **shipped → delivered**
+ *       - delivered / cancelled → terminal (no further transitions)
+ *
+ *       When transitioning to `shipped`, provide `trackingNumber`, `shippingProvider`,
+ *       and `estimatedDelivery` to record fulfillment details.
+ *
+ *       When transitioning to `cancelled`, provide `cancellationReason` and the service
+ *       will automatically restore stock in the product service.
+ *
+ *       Lifecycle timestamps (`confirmedAt`, `shippedAt`, `deliveredAt`, `cancelledAt`)
+ *       are set automatically on each transition.
  *     parameters:
  *       - in: path
  *         name: id
@@ -201,6 +215,12 @@ router.patch(
   [
     param('id').isUUID().withMessage('Invalid order ID'),
     body('status').isIn(VALID_STATUSES).withMessage(`status must be one of: ${VALID_STATUSES.join(', ')}`),
+    // Fulfillment fields (relevant when status = 'shipped')
+    body('trackingNumber').optional().isString().trim().isLength({ max: 100 }).withMessage('trackingNumber must be a string up to 100 chars'),
+    body('shippingProvider').optional().isString().trim().isLength({ max: 100 }).withMessage('shippingProvider must be a string up to 100 chars'),
+    body('estimatedDelivery').optional().isISO8601().withMessage('estimatedDelivery must be a valid ISO 8601 date'),
+    // Cancellation fields (relevant when status = 'cancelled')
+    body('cancellationReason').optional().isString().trim().isLength({ max: 500 }).withMessage('cancellationReason must be a string up to 500 chars'),
     validate,
   ],
   orderController.updateStatus,

@@ -5,9 +5,12 @@ class OrderController {
   async create(req, res, next) {
     try {
       const userId = req.headers['x-user-id'];
-      const { countryId, items } = req.body;
+      const { countryId, items, shippingAddress, notes } = req.body;
       const correlationId = req.correlationId ? req.correlationId() : undefined;
-      const order = await orderService.createOrder({ userId, countryId, items }, correlationId);
+      const order = await orderService.createOrder(
+        { userId, countryId, items, shippingAddress, notes },
+        correlationId,
+      );
       logger.info({ orderId: order.id, userId }, 'Order created');
       res.status(201).json(order);
     } catch (error) {
@@ -44,7 +47,14 @@ class OrderController {
 
   async updateStatus(req, res, next) {
     try {
-      const order = await orderService.updateStatus(req.params.id, req.body.status);
+      const { status, trackingNumber, shippingProvider, estimatedDelivery, cancellationReason } = req.body;
+      const correlationId = req.correlationId ? req.correlationId() : undefined;
+      const order = await orderService.updateStatus(
+        req.params.id,
+        status,
+        { trackingNumber, shippingProvider, estimatedDelivery, cancellationReason },
+        correlationId,
+      );
       logger.info({ orderId: order.id, status: order.status }, 'Order status updated');
       res.json(order);
     } catch (error) {
