@@ -36,6 +36,9 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 # Pruned node_modules (workspace symlinks resolved to real directories by Docker COPY)
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 
+# Per-service node_modules (packages npm did not hoist to root in workspace layout)
+COPY --from=builder --chown=nodejs:nodejs /app/omnicore-order/node_modules ./omnicore-order/node_modules
+
 # Shared DB package (needed to resolve node_modules/@omnicore/db symlink → ../../omnicore-db)
 COPY --chown=nodejs:nodejs omnicore-db/ ./omnicore-db/
 
