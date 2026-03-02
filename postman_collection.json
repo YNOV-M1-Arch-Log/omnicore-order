@@ -1,0 +1,319 @@
+{
+  "info": {
+    "name": "Omnicore Order Service — Direct Tests",
+    "description": "Tests the Order Service directly on port 3004 (bypassing the gateway). Because there is no JWT validation at this layer, pass `X-User-Id` manually via the collection variable `userId`.\n\n**Prerequisites:** A valid `countryProductId` must already exist in the DB. Set the `countryProductId` and `countryId` variables before running.\n\n**Newman CLI:**\n```\nnewman run postman_collection.json \\\n  --env-var countryProductId=<uuid> \\\n  --env-var countryId=<uuid> \\\n  --env-var userId=<uuid> \\\n  --delay-request 100\n```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",          "value": "http://localhost:3004", "type": "string" },
+    { "key": "userId",           "value": "aecfcc62-4b8e-4720-9a42-bc8566424598", "type": "string",
+      "_comment": "Default: admin@omnicore.dev — change to your user UUID" },
+    { "key": "countryId",        "value": "e1e82eb8-1634-4daf-a3c5-452b6d28179f", "type": "string",
+      "_comment": "Default: France — change if needed" },
+    { "key": "countryProductId", "value": "", "type": "string",
+      "_comment": "Must be set before running — a CountryProduct that belongs to countryId" },
+    { "key": "orderId",          "value": "", "type": "string" },
+    { "key": "cancelOrderId",    "value": "", "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "01 — Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test(\"Service name\", () => pm.expect(body.service).to.eql('omnicore-order'));",
+            "pm.test(\"Status OK\", () => pm.expect(body.status).to.eql('OK'));",
+            "pm.test(\"Has correlationId\", () => pm.expect(body.correlationId).to.be.a('string'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "02 — Create Orders",
+      "item": [
+        {
+          "name": "POST /api/orders — valid (pending)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test(\"Status is pending\", () => pm.expect(body.status).to.eql('pending'));",
+            "pm.test(\"Has id\", () => pm.expect(body.id).to.be.a('string'));",
+            "pm.test(\"Has totalAmount > 0\", () => pm.expect(parseFloat(body.totalAmount)).to.be.above(0));",
+            "pm.test(\"Has items array\", () => pm.expect(body.items).to.be.an('array').with.length.above(0));",
+            "pm.collectionVariables.set('orderId', body.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"countryId\":\"{{countryId}}\",\"items\":[{\"countryProductId\":\"{{countryProductId}}\",\"quantity\":2}],\"shippingAddress\":{\"street\":\"10 Rue de Rivoli\",\"city\":\"Paris\",\"postalCode\":\"75001\"},\"notes\":\"Direct service test\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] }
+          }
+        },
+        {
+          "name": "POST /api/orders — missing items → 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+            "pm.test(\"Has errors array\", () => pm.expect(pm.response.json().errors).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"countryId\":\"{{countryId}}\",\"items\":[]}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] }
+          }
+        },
+        {
+          "name": "POST /api/orders — invalid countryId → 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"countryId\":\"not-a-uuid\",\"items\":[{\"countryProductId\":\"{{countryProductId}}\",\"quantity\":1}]}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] }
+          }
+        },
+        {
+          "name": "POST /api/orders — unknown countryProductId → 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"countryId\":\"{{countryId}}\",\"items\":[{\"countryProductId\":\"00000000-0000-0000-0000-000000000000\",\"quantity\":1}]}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "03 — Read Orders",
+      "item": [
+        {
+          "name": "GET /api/orders",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "pm.test(\"Returns array\", () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] }
+          }
+        },
+        {
+          "name": "GET /api/orders?status=pending",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "const orders = pm.response.json();",
+            "pm.test(\"All pending\", () => orders.forEach(o => pm.expect(o.status).to.eql('pending')));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders?status=pending", "host": ["{{baseUrl}}"], "path": ["api","orders"], "query": [{ "key": "status", "value": "pending" }] }
+          }
+        },
+        {
+          "name": "GET /api/orders?countryId={{countryId}}",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "pm.test(\"Returns array\", () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders?countryId={{countryId}}", "host": ["{{baseUrl}}"], "path": ["api","orders"], "query": [{ "key": "countryId", "value": "{{countryId}}" }] }
+          }
+        },
+        {
+          "name": "GET /api/orders/:id",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test(\"Correct id\", () => pm.expect(body.id).to.eql(pm.collectionVariables.get('orderId')));",
+            "pm.test(\"Has items with countryProduct\", () => pm.expect(body.items[0].countryProduct).to.be.an('object'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api","orders","{{orderId}}"] }
+          }
+        },
+        {
+          "name": "GET /api/orders/unknown → 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders/00000000-0000-0000-0000-000000000000", "host": ["{{baseUrl}}"], "path": ["api","orders","00000000-0000-0000-0000-000000000000"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "04 — Order Lifecycle",
+      "item": [
+        {
+          "name": "PATCH status → confirmed",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test(\"Status confirmed\", () => pm.expect(body.status).to.eql('confirmed'));",
+            "pm.test(\"confirmedAt set\", () => pm.expect(body.confirmedAt).to.not.be.null);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"status\":\"confirmed\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api","orders","{{orderId}}","status"] }
+          }
+        },
+        {
+          "name": "PATCH status → shipped (with fulfillment fields)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test(\"Status shipped\", () => pm.expect(body.status).to.eql('shipped'));",
+            "pm.test(\"shippedAt set\", () => pm.expect(body.shippedAt).to.not.be.null);",
+            "pm.test(\"trackingNumber set\", () => pm.expect(body.trackingNumber).to.eql('NM-DIRECT-001'));",
+            "pm.test(\"shippingProvider set\", () => pm.expect(body.shippingProvider).to.eql('UPS'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"status\":\"shipped\",\"trackingNumber\":\"NM-DIRECT-001\",\"shippingProvider\":\"UPS\",\"estimatedDelivery\":\"2026-04-15T00:00:00Z\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api","orders","{{orderId}}","status"] }
+          }
+        },
+        {
+          "name": "PATCH invalid transition shipped→pending → 422",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 422\", () => pm.response.to.have.status(422));",
+            "pm.test(\"Error message mentions transition\", () => pm.expect(pm.response.json().error.message).to.include('Cannot transition'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"status\":\"pending\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api","orders","{{orderId}}","status"] }
+          }
+        },
+        {
+          "name": "PATCH status → delivered",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test(\"Status delivered\", () => pm.expect(body.status).to.eql('delivered'));",
+            "pm.test(\"deliveredAt set\", () => pm.expect(body.deliveredAt).to.not.be.null);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"status\":\"delivered\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api","orders","{{orderId}}","status"] }
+          }
+        },
+        {
+          "name": "PATCH delivered→cancelled (terminal) → 422",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"status\":\"cancelled\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api","orders","{{orderId}}","status"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "05 — Cancel & Stock Restore",
+      "item": [
+        {
+          "name": "POST /api/orders (for cancellation test)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('cancelOrderId', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"countryId\":\"{{countryId}}\",\"items\":[{\"countryProductId\":\"{{countryProductId}}\",\"quantity\":3}],\"notes\":\"Will be cancelled to verify stock restore\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] }
+          }
+        },
+        {
+          "name": "PATCH pending → cancelled (with reason + stock restore)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test(\"Status cancelled\", () => pm.expect(body.status).to.eql('cancelled'));",
+            "pm.test(\"cancelledAt set\", () => pm.expect(body.cancelledAt).to.not.be.null);",
+            "pm.test(\"cancellationReason set\", () => pm.expect(body.cancellationReason).to.eql('Direct service cancel test'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"status\":\"cancelled\",\"cancellationReason\":\"Direct service cancel test\"}" },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{cancelOrderId}}/status", "host": ["{{baseUrl}}"], "path": ["api","orders","{{cancelOrderId}}","status"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "06 — Delete",
+      "item": [
+        {
+          "name": "DELETE /api/orders/:id (the cancel order)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/api/orders/{{cancelOrderId}}", "host": ["{{baseUrl}}"], "path": ["api","orders","{{cancelOrderId}}"] }
+          }
+        },
+        {
+          "name": "DELETE /api/orders/unknown → 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/api/orders/00000000-0000-0000-0000-000000000000", "host": ["{{baseUrl}}"], "path": ["api","orders","00000000-0000-0000-0000-000000000000"] }
+          }
+        }
+      ]
+    }
+
+  ]
+}
