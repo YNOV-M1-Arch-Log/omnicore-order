@@ -50,7 +50,7 @@ const buildEcsLog = (overrides = {}) => {
   };
 
   // Pretty print in development for better readability
-  if (env === 'development' && !process.env.CI) {
+  if (env === 'development' && !process.env.CI && process.stdout.isTTY) {
     config.transport = {
       target: 'pino-pretty',
       options: {
