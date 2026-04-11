@@ -5,7 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const pinoHttpMiddleware = require('./middlewares/pino-http');
 const { correlationId, attachCorrelationId } = require('./middlewares/correlation');
-const { logger } = require('./config/logger');
+const errorHandler = require('./middlewares/error-handler');
 
 const app = express();
 
@@ -29,28 +29,6 @@ app.get('/health', (req, res) => {
 
 app.use('/api', require('./routes'));
 
-app.use((err, req, res, _next) => {
-  const correlationId = req.correlationId ? req.correlationId() : 'unknown';
-
-  logger.error(
-    {
-      err,
-      correlationId,
-      status: err.status || 500,
-      method: req.method,
-      path: req.originalUrl,
-      ip: req.ip,
-    },
-    'Unhandled application error',
-  );
-
-  res.status(err.status || 500).json({
-    error: {
-      message: err.message || 'Internal Server Error',
-      status: err.status || 500,
-      correlationId,
-    },
-  });
-});
+app.use(errorHandler);
 
 module.exports = app;
