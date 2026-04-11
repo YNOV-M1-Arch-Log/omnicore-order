@@ -5,4 +5,5 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   databaseUrl: process.env.DATABASE_URL,
   productServiceUrl: process.env.PRODUCT_SERVICE_URL || 'http://localhost:3001',
+  internalServiceToken: process.env.INTERNAL_SERVICE_TOKEN,
 };

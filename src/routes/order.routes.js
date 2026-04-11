@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/order.controller');
 const { body, param, query, validationResult } = require('express-validator');
+const internalAuth = require('../middlewares/internalAuth');
 
 const VALID_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
@@ -151,6 +152,7 @@ router.get(
  */
 router.get(
   '/:id',
+  internalAuth,
   [
     param('id').isUUID().withMessage('Invalid order ID'),
     validate,
@@ -212,6 +214,7 @@ router.get(
  */
 router.patch(
   '/:id/status',
+  internalAuth,
   [
     param('id').isUUID().withMessage('Invalid order ID'),
     body('status').isIn(VALID_STATUSES).withMessage(`status must be one of: ${VALID_STATUSES.join(', ')}`),

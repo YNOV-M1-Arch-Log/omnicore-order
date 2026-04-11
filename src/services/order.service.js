@@ -112,6 +112,7 @@ class OrderService {
             headers: {
               'Content-Type': 'application/json',
               'X-Correlation-Id': correlationId || 'unknown',
+              'X-Internal-Service-Token': config.internalServiceToken,
             },
             body: JSON.stringify({ quantity: newQuantity }),
           },
@@ -218,6 +219,7 @@ class OrderService {
             headers: {
               'Content-Type': 'application/json',
               'X-Correlation-Id': correlationId || 'unknown',
+              'X-Internal-Service-Token': config.internalServiceToken,
             },
             body: JSON.stringify({ quantity: restoredQuantity }),
           },
