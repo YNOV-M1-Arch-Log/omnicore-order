@@ -16,9 +16,15 @@ class OrderRepository {
 
   findAll({ userId, status, countryId } = {}) {
     const where = {};
-    if (userId) where.userId = userId;
-    if (status) where.status = status;
-    if (countryId) where.countryId = countryId;
+    if (userId) {
+      where.userId = userId;
+    }
+    if (status) {
+      where.status = status;
+    }
+    if (countryId) {
+      where.countryId = countryId;
+    }
 
     return prisma.order.findMany({
       where,

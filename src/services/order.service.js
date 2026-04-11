@@ -169,13 +169,21 @@ class OrderService {
 
     // Set the lifecycle timestamp for this transition
     const tsField = STATUS_TIMESTAMPS[status];
-    if (tsField) updateData[tsField] = new Date();
+    if (tsField) {
+      updateData[tsField] = new Date();
+    }
 
     // Attach fulfillment fields when shipping
     if (status === 'shipped') {
-      if (trackingNumber)    updateData.trackingNumber   = trackingNumber;
-      if (shippingProvider)  updateData.shippingProvider = shippingProvider;
-      if (estimatedDelivery) updateData.estimatedDelivery = new Date(estimatedDelivery);
+      if (trackingNumber)    {
+        updateData.trackingNumber   = trackingNumber;
+      }
+      if (shippingProvider)  {
+        updateData.shippingProvider = shippingProvider;
+      }
+      if (estimatedDelivery) {
+        updateData.estimatedDelivery = new Date(estimatedDelivery);
+      }
     }
 
     // Attach cancellation reason
@@ -208,7 +216,9 @@ class OrderService {
 
     for (const item of fullOrder.items) {
       const cp = countryProducts.find((p) => p.id === item.countryProductId);
-      if (!cp) continue;
+      if (!cp) {
+        continue;
+      }
 
       const restoredQuantity = cp.quantity + item.quantity;
       try {

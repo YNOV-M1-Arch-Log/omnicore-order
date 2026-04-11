@@ -23,9 +23,15 @@ class OrderController {
     try {
       const { userId, status, countryId } = req.query;
       const filters = {};
-      if (userId) filters.userId = userId;
-      if (status) filters.status = status;
-      if (countryId) filters.countryId = countryId;
+      if (userId) {
+        filters.userId = userId;
+      }
+      if (status) {
+        filters.status = status;
+      }
+      if (countryId) {
+        filters.countryId = countryId;
+      }
 
       const orders = await orderService.getAll(filters);
       res.json(orders);
